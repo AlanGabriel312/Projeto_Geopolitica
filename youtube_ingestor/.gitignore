@@ -1,0 +1,16 @@
+# Cache do Python (gerado ao rodar o app e o scheduler)
+__pycache__/
+
+# Dados locais (impede que os arquivos baixados do YouTube subam para o Git)
+datalake/
+
+# Configurações locais e credenciais (caso existam dentro de config/ ou na raiz)
+.env
+config/local_settings.py
+config/*.env
+
+# Arquivos temporários do sistema e editores
+.vscode/
+.idea/
+*.swp
+.DS_Store
