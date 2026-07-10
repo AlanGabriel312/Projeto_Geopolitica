@@ -41,6 +41,23 @@ CREATE TABLE IF NOT EXISTS channel_watermark (
 
 CREATE INDEX IF NOT EXISTS idx_state_channel ON ingestion_state(channel_id);
 CREATE INDEX IF NOT EXISTS idx_state_status  ON ingestion_state(status);
+
+-- Historico de ciclos de ingestao (1 linha por canal por execucao).
+-- Fonte para o dashboard de OBSERVACAO: quantos ciclos rodaram, quando, e o
+-- balanco descobertos/ingeridos/pulados/falhas de cada um.
+CREATE TABLE IF NOT EXISTS ingestion_runs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_at        TEXT NOT NULL,          -- ISO 8601 (fim do ciclo)
+    canal         TEXT,
+    channel_id    TEXT,
+    dominio       TEXT,
+    descobertos   INTEGER DEFAULT 0,
+    ingeridos     INTEGER DEFAULT 0,
+    pulados       INTEGER DEFAULT 0,
+    falhas        INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_runs_at ON ingestion_runs(run_at);
 """
 
 
@@ -139,3 +156,55 @@ class StateStore:
                 "SELECT status, COUNT(*) n FROM ingestion_state GROUP BY status"
             ).fetchall()
             return {r["status"]: r["n"] for r in rows}
+
+    def log_run(self, canal: dict, res: dict) -> None:
+        """Grava uma linha por ciclo de ingestao (alimenta o dashboard de Observacao)."""
+        with self._conn() as c:
+            c.execute("""
+                INSERT INTO ingestion_runs
+                    (run_at, canal, channel_id, dominio,
+                     descobertos, ingeridos, pulados, falhas)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (_now(), canal.get("nome"), canal.get("channel_id"),
+                  canal.get("dominio"),
+                  res.get("descobertos", 0), res.get("ingeridos", 0),
+                  res.get("pulados_idempotencia", 0), res.get("falhas", 0)))
+
+    # --- Leituras para o dashboard de Observacao (retornam list[dict]) ----
+    def _rows(self, sql: str, args: tuple = ()) -> list[dict]:
+        with self._conn() as c:
+            return [dict(r) for r in c.execute(sql, args).fetchall()]
+
+    def runs(self, limite: int = 500) -> list[dict]:
+        """Ciclos de ingestao, mais recentes primeiro."""
+        return self._rows(
+            "SELECT * FROM ingestion_runs ORDER BY run_at DESC LIMIT ?", (limite,))
+
+    def watermarks(self) -> list[dict]:
+        """Estado de incrementalidade por canal."""
+        return self._rows(
+            "SELECT * FROM channel_watermark ORDER BY last_run_at DESC")
+
+    def ingestoes_por_dia(self) -> list[dict]:
+        """Videos ingeridos por dia (evolucao ao longo do periodo de observacao)."""
+        return self._rows("""
+            SELECT substr(ingested_at, 1, 10) AS dia, COUNT(*) AS ingeridos
+            FROM ingestion_state
+            WHERE status='INGESTED' AND ingested_at IS NOT NULL
+            GROUP BY dia ORDER BY dia
+        """)
+
+    def falhas(self, limite: int = 200) -> list[dict]:
+        """Videos que falharam, com o motivo (para diagnostico)."""
+        return self._rows("""
+            SELECT video_id, channel_id, dominio, error, attempts, discovered_at
+            FROM ingestion_state WHERE status='FAILED'
+            ORDER BY discovered_at DESC LIMIT ?
+        """, (limite,))
+
+    def ultima_execucao(self) -> str | None:
+        """Timestamp ISO do ciclo mais recente (para o indicador de saude)."""
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT MAX(run_at) AS ult FROM ingestion_runs").fetchone()
+            return row["ult"] if row else None

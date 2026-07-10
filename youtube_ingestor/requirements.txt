@@ -7,3 +7,5 @@ youtube-transcript-api>=1.0
 google-api-python-client>=2.0
 APScheduler>=3.10
 PyYAML>=6.0
+streamlit>=1.40
+plotly>=5.20

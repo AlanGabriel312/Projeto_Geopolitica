@@ -216,5 +216,6 @@ def rodar_ciclo(canal: dict, glob_cfg: dict, store: StateStore) -> dict:
 
     res = {"canal": canal["nome"], "descobertos": novos, "ingeridos": ingeridos,
            "pulados_idempotencia": pulados, "falhas": falhas}
+    store.log_run(canal, res)   # registra o ciclo para o dashboard de Observacao
     log.info("ciclo %s -> %s", canal["nome"], res)
     return res
