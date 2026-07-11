@@ -183,6 +183,12 @@ def rodar_ciclo(canal: dict, glob_cfg: dict, store: StateStore) -> dict:
         store.marcar_descoberto(v.video_id, cid, dom, v.published_at, v.title)
         max_pub = max(max_pub, v.published_at or "")
         novos += 1
+    
+        # Ignora transmissões ao vivo
+        if v.live_broadcast_content == "live":
+            log.info(f"Pulando live em andamento: {v.title}")
+            pulados += 1
+            continue
 
         # === CORRIGIDO: Passa a flag is_demo corrigida para a extração ===
         trechos = extrair_transcricao(
