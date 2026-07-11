@@ -29,6 +29,9 @@ from .state import StateStore, content_hash
 from .discovery import get_discovery
 from .transcript import extrair_transcricao
 
+import time
+import random
+
 log = logging.getLogger("ingestor")
 
 STOPWORDS = {"entao", "olha", "ne", "tipo", "veja", "bem", "o", "a", "que",
@@ -192,9 +195,17 @@ def rodar_ciclo(canal: dict, glob_cfg: dict, store: StateStore) -> dict:
 
         # === CORRIGIDO: Passa a flag is_demo corrigida para a extração ===
         trechos = extrair_transcricao(
-            v.video_id, glob_cfg.get("idiomas_legenda", ["pt", "pt-BR"]),
-            vocab, is_demo)
-            
+            v.video_id, 
+            glob_cfg.get("idiomas_legenda", ["pt", "pt-BR"]),
+            vocab, 
+            is_demo
+        )
+
+        # Evita muitas requisições consecutivas ao YouTube
+        espera = random.randint(3, 8)
+        log.info(f"Aguardando {espera}s antes do próximo vídeo...")
+        time.sleep(espera)
+                    
         if not trechos:
             store.marcar_falha(v.video_id, "sem legenda")
             falhas += 1
@@ -214,7 +225,7 @@ def rodar_ciclo(canal: dict, glob_cfg: dict, store: StateStore) -> dict:
             store.marcar_falha(v.video_id, e)
             falhas += 1
 
-    if novos:
+    if ingeridos > 0:
         store.update_watermark(cid, max_pub, ingeridos)
         
     # === COMPATIBILIZADO: Envia o vocabulário lido do .yaml direto para as regras SQL ===
