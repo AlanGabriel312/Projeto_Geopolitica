@@ -7,11 +7,19 @@
 
 canais:
 
-  - nome: "Geopolitica - Noticias"
+  - nome: "Geopolitica - Noticias - JovemPan News"
+    channel_id: "UCP391YRAjSOdM_bwievgaZA"    # ID Real do canal JovemPan News
+    dominio: "geopolitica"
+    intervalo_min: 30         # Mantido o padrão de alta volatilidade
+    max_videos_por_ciclo: 6
+    vocabulario: ["guerra", "sancao", "conflito", "embargo", "tropas", "fronteira", "acordo"]
+    ativo: true
+
+  - nome: "Geopolitica - Noticias - CNN Brasil"
     channel_id: "UCvdwhh_fDyWccR42-rReZLw"   # ID Real do canal CNN Brasil
     dominio: "geopolitica"
-    intervalo_min: 5          # Mantido o padrão de alta volatilidade
-    max_videos_por_ciclo: 20
+    intervalo_min: 30         # Mantido o padrão de alta volatilidade
+    max_videos_por_ciclo: 6
     vocabulario: ["guerra", "sancao", "conflito", "embargo", "tropas", "fronteira", "acordo"]
     ativo: true
 
