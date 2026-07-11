@@ -18,12 +18,20 @@ st.set_page_config(
 )
 
 # ==============================================================================
+# BOTÃO DE ATUALIZAÇÃO MANUAL
+# ==============================================================================
+with st.sidebar:
+    st.header("📋 Ficha Técnica")
+
+    if st.button("🔄 Atualizar dados"):
+        st.rerun()
+
+# ==============================================================================
 # LEITURA DE DADOS DA CAMADA GOLD (DATA LAKE CONTROLE)
 # ==============================================================================
 PATH_GOLD_INDIVIDUAL = "./datalake/gold/clipping_geopolitica.parquet"
 PATH_GOLD_CONEXOES = "./datalake/gold/coocorrencia_paises.parquet"
 
-@st.cache_data
 def carregar_dados_gold():
     """Lê os parquets analíticos da Gold de forma segura e com cache de RAM."""
     if not os.path.exists(PATH_GOLD_INDIVIDUAL) or not os.path.exists(PATH_GOLD_CONEXOES):
