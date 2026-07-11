@@ -103,7 +103,7 @@ class YouTubeDiscovery:
 
                 page_count += 1
 
-                if page_count > 5:
+                if page_count > 2:
                     print("Limite de páginas atingido")
                     break
 
