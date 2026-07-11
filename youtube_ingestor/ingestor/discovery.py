@@ -44,6 +44,7 @@ class VideoMeta:
     tags: list
     category_id: str
     default_audio_language: str
+    live_broadcast_content: str
 
     def to_row(self) -> dict:
         d = asdict(self)
@@ -71,7 +72,7 @@ class YouTubeDiscovery:
     def _uploads_playlist(self, channel_id: str) -> str:
         try:
             resp = self._client().channels().list(
-                part="contentDetails", id=channel_id).execute()
+                part="contentDetails,snippet", id=channel_id).execute()
             items = resp.get("items", [])
             if not items:
                 raise ValueError(f"Canal nao encontrado no YouTube: {channel_id}")
@@ -81,32 +82,94 @@ class YouTubeDiscovery:
             raise e
 
     def descobrir(self, channel_id: str, since_iso: str | None,
-                  max_videos: int, janela_dias: int) -> list[VideoMeta]:
+                max_videos: int, janela_dias: int) -> list[VideoMeta]:
+
+        print("=" * 80)
+        print(f"CANAL: {channel_id}")
+        print(f"WATERMARK: {since_iso}")
+        print("=" * 80)
+
         try:
             uploads = self._uploads_playlist(channel_id)
+            print("UPLOAD PLAYLIST:", uploads)
+
             corte = datetime.now(timezone.utc) - timedelta(days=janela_dias)
-            ids, page = [], None
-            
+
+            page_count = 0
+            ids = []
+            page = None
+
             while len(ids) < max_videos:
-                resp = self._client().playlistItems().list(
-                    part="contentDetails", playlistId=uploads,
-                    maxResults=min(50, max_videos), pageToken=page).execute()
-                
-                for it in resp.get("items", []):
-                    pub = it["contentDetails"].get("videoPublishedAt", "")
-                    # Mecanismo Incremental (Watermark) do professor em ação
-                    if since_iso and pub <= since_iso:
-                        return self._hidratar(channel_id, ids)  # Passou do watermark, encerra
-                    if pub and pub >= corte.isoformat():
-                        ids.append(it["contentDetails"]["videoId"])
-                        
-                page = resp.get("nextPageToken")
-                if not page:
+
+                page_count += 1
+
+                if page_count > 5:
+                    print("Limite de páginas atingido")
                     break
-                    
-            return self._hidratar(channel_id, ids[:max_videos])
+
+                resp = self._client().playlistItems().list(
+                    part="snippet,contentDetails",
+                    playlistId=uploads,
+                    maxResults=5,
+                    pageToken=page,
+                ).execute()
+
+                print(f"\nPágina da API: {page or 'primeira'}")
+
+                for it in resp.get("items", []):
+
+                    vid = it["contentDetails"]["videoId"]
+                    pub = it["snippet"]["publishedAt"]
+
+                    print(f"VIDEO: {vid} | {pub}")
+
+                    # watermark normal
+                    if since_iso and pub <= since_iso:
+                        print(">>> VIDEO ANTIGO, IGNORANDO <<<")
+                        continue
+
+                    # dentro da janela
+                    if pub >= corte.isoformat():
+                        print("   -> NOVO VIDEO")
+                        ids.append(vid)
+                    else:
+                        print("   -> FORA DA JANELA")
+
+
+                page = resp.get("nextPageToken")
+
+                if not page:
+                    print("Fim da playlist.")
+                    break
+
+            videos = self._hidratar(channel_id, ids[:max_videos])
+
+            # Remove lives agendadas
+            videos_validos = []
+
+            for v in videos:
+
+                if v.live_broadcast_content == "upcoming":
+                    print(f">>> LIVE AGENDADA IGNORADA: {v.title}")
+                    continue
+
+                # aceita live acontecendo mesmo se published_at for antigo
+                if v.live_broadcast_content == "live":
+                    print(f">>> LIVE EM ANDAMENTO IGNORADA: {v.title}")
+                    continue
+
+                videos_validos.append(v)
+
+            print("\nVIDEOS QUE SERAO PROCESSADOS:")
+            print([v.video_id for v in videos_validos])
+
+            return videos_validos
+
+
         except Exception as e:
-            log.error(f"⚠️ Erro no processo de descoberta do canal {channel_id}: {e}")
+            log.error(
+                f"⚠️ Erro no processo de descoberta do canal {channel_id}: {e}"
+            )
             return []
 
     def _hidratar(self, channel_id: str, ids: list[str]) -> list[VideoMeta]:
@@ -120,16 +183,19 @@ class YouTubeDiscovery:
             sn, st = it["snippet"], it.get("statistics", {})
             cd = it.get("contentDetails", {})
             out.append(VideoMeta(
-                video_id=it["id"], channel_id=channel_id,
-                title=sn.get("title", ""), description=sn.get("description", "")[:500],
+                video_id=it["id"],
+                channel_id=channel_id,
+                title=sn.get("title", ""),
+                description=sn.get("description", "")[:500],
                 published_at=sn.get("publishedAt", ""),
                 duration_iso=cd.get("duration", ""),
                 view_count=int(st.get("viewCount", 0)),
                 like_count=int(st.get("likeCount", 0)),
                 comment_count=int(st.get("commentCount", 0)),
-                tags=sn.get("tags", []) if sn.get("tags") else [], 
+                tags=sn.get("tags", []) if sn.get("tags") else [],
                 category_id=sn.get("categoryId", ""),
                 default_audio_language=sn.get("defaultAudioLanguage", ""),
+                live_broadcast_content=sn.get("liveBroadcastContent", "none"),
             ))
         return out
 
