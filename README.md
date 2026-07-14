@@ -25,7 +25,7 @@ Automatizar a extração contínua de transcrições de notícias (nos idiomas p
 ### Perguntas Analíticas Respondidas
 1. Qual país detém a maior parcela de tempo de exposição (Share of Voice) nas discussões atuais?
 2. Quais blocos geopolíticos (OTAN, BRICS+, Oriente Médio) concentram as maiores menções?
-3. Qual é o contexto semântico associado a cada país? (Ex: A Rússia está mais associada a 'guerra' ou a 'acordo'?)
+3. Qual é o contexto geopolitico associado a cada país? (Ex: A Rússia está mais associada a qual país?)
 
 ### Fora de Escopo
 *   Análise de sentimento refinada via NLP/LLM complexo.
@@ -52,7 +52,6 @@ O pipeline opera em ciclos de ingestão a cada 12 horas, persistindo os dados no
 ### Camada Gold (Agregação de Negócio)
 *   **Motor Computacional**: DuckDB executando queries diretamente sobre os arquivos Parquet em memória.
 *   **Visões Analíticas**:
-    *   *Share of Voice (KPI)*: Tempo total de exposição e menções por país.
     *   *Contexto Semântico*: Matriz de coocorrência frase a frase entre nações citadas e vocabulários de ação.
     *   *Blocos Geopolíticos*: Agrupamento automatizado em alianças estratégicas (OTAN, BRICS+, Oriente Médio).
 
