@@ -8,9 +8,9 @@
 | :--- | :--- |
 | **Nome do projeto** | Análise Guerra Rússia x Ucrânia |
 | **Tema / domínio** | Geopolítica & Notícias (Tema #3) |
-| **Equipe** | Alan Alvarado | Henrique Silva Oliveira
-| **E-mail** | alan.alvarado@edu.unifor.br | henrique.oliveira@edu.unifor.br
-| **Data de início** | 26/06/2026 | 
+| **Equipe** | Alan Alvarado<br>Henrique Silva Oliveira |
+| **E-mail** | alan.alvarado@edu.unifor.br<br>henrique.oliveira@edu.unifor.br |
+| **Data de início** | 26/06/2026 |
 
 ---
 
