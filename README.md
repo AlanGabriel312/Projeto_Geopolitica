@@ -59,7 +59,7 @@ O pipeline opera em ciclos de ingestão a cada 12 horas, persistindo os dados no
 
 ## 4. Princípios de Engenharia Aplicados
 
-*   **Idempotência**: Gerenciada via banco de controle SQLite (`datalake/control/ingestion.db`). Registra watermarks dos metadados processados. Se reexecutado para o mesmo lote, o ingestor pula o registro, evitando duplicidade nas camadas Silver e Gold.
+*   **Idempotência**: Gerenciada via banco de controle SQLite (`datalake/control/ingestion.db`). Registra watermarks dos metadados processados. Se reexecutado para o mesmo lote, o ingestor pula o registro, evitando duplicidade nas camadas silver e Gold.
 *   **Tratamento de Erros**: Blocos estruturados de try/except isolam falhas de rede e erros nativos como `NoTranscriptFound`. A falha de uma única fonte nunca derruba o pipeline.
 *   **Rastreabilidade e Observabilidade**: Quantificação em tempo real de linhas lidas, descartes e registros promovidos. Logs rotativos em produção acompanham o comportamento do ingestor e do agendador (`scheduler.py`).
 
