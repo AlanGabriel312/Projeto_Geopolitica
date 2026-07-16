@@ -50,6 +50,8 @@ def extrair_transcricao(video_id: str, idiomas: list[str],
                 for s in fetched]
                 
     except Exception as e:
-        log.warning(f"Erro ao capturar legenda real do vídeo {video_id}: {type(e).__name__}")
-        # video sem legenda ou IP bloqueado: registra vazio para o pipeline marcar SKIPPED/FAILED de forma segura
+        log.exception(
+            "Erro ao capturar legenda do vídeo %s",
+            video_id,
+        )
         return []
