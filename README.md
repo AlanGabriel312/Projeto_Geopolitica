@@ -1,6 +1,6 @@
 # Arquitetura e Documentação do Projeto — Monitoramento Geopolítico
 
-O Monitoramento Geopolítico é um Data Lakehouse automatizado que extrai, limpa e analisa transcrições de canais jornalísticos de grande circulação no YouTube (como a CNN Brasil). O sistema monitora o impacto de crises internacionais nas narrativas midiáticas para apoiar analistas de risco e gestores corporativos na tomada de decisões em menos de 24 horas.
+O Monitoramento Geopolítico é um Data Lakehouse automatizado que extrai, limpa e analisa transcrições de canais jornalísticos de grande circulação no YouTube (como a CNN Brasil). O sistema monitora o impacto de crises internacionais nas narrativas midiáticas para apoiar analistas de risco e gestores corporativos na tomada de decisões em menos de 24 horas .
 
 ---
 
