@@ -1,4 +1,4 @@
-certo, eu posso voltar pra esse cod "# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 Captacao da transcricao (camada Bronze). Resiliente: se a legenda nao existe
 ou o ambiente esta sem rede, cai num gerador sintetico deterministico.
