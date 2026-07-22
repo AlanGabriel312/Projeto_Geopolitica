@@ -82,87 +82,194 @@ def _persistir(df: pd.DataFrame, dominio: str, video_id: str):
 
 
 def _gold(dominio: str, vocabulario: list[str]):
-    """Especialização da Camada Gold para Geopolítica usando DuckDB + Parquet particionado."""
+    """Camada Gold para Geopolítica."""
+
     src = f"./datalake/silver/dominio={dominio}/**/*.parquet"
-    
-    # Lista Massiva de Países para Monitoramento na Gold
+
     paises_monitorados = [
-        "russia", "ucrania", "ira", "israel", "china", "venezuela", "brasil",
-        "eua", "estados unidos", "siria", "libano", "iemen", "palestina", 
-        "taiwan", "coreia", "japao", "india", "reino unido", "franca", 
-        "alemanha", "italia", "espanha", "portugal", "canada", "mexico", 
-        "colombia", "argentina", "chile", "cuba", "egito", "arabia saudita", 
-        "turquia", "pakistan", "afeganistao", "nigeria", "africa do sul"
+        "russia", "ucrania", "ira", "israel", "china", "venezuela",
+        "brasil", "eua", "estados unidos", "siria", "libano",
+        "iemen", "palestina", "taiwan", "coreia", "japao",
+        "india", "reino unido", "franca", "alemanha", "italia",
+        "espanha", "portugal", "canada", "mexico", "colombia",
+        "argentina", "chile", "cuba", "egito", "arabia saudita",
+        "turquia", "paquistao", "afeganistao", "nigeria",
+        "africa do sul"
     ]
-    
-     # === MODIFICADO: Se o vocabulario vier vazio, aplica a lista padrão por segurança ===
-    termos_conflito = vocabulario if vocabulario else ["guerra", "sancao", "conflito", "embargo", "tropas", "fronteira", "acordo"]
-    
+
+    termos_conflito = (
+        vocabulario
+        if vocabulario
+        else [
+            "guerra",
+            "sancao",
+            "conflito",
+            "embargo",
+            "tropas",
+            "fronteira",
+            "acordo",
+        ]
+    )
+
     con = duckdb.connect()
-    lista_paises_sql = "', '".join(paises_monitorados)
-    lista_termos_sql = "', '".join(termos_conflito)
-    
+
     try:
-        # QUERY 1: Filtra e aceita apenas os vídeos que contém os termos do seu vocabulário yaml
-        gold_individual = con.execute(r"""
-            WITH s AS (SELECT * FROM read_parquet('""" + src + r"""')),
-                 alvo_pais AS (SELECT UNNEST(['""" + lista_paises_sql + r"""']) AS pais),
-                 alvo_termo AS (SELECT UNNEST(['""" + lista_termos_sql + r"""']) AS termo),
-                 
-                 videos_validos AS (
-                     SELECT DISTINCT s.video_id 
-                     FROM s
-                     JOIN alvo_termo t ON REGEXP_MATCHES(s.texto_limpo, '(^|\s)' || t.termo || '($|\s)')
-                 )
-            SELECT a.pais, 
-                   COUNT(*) AS mencoes
-            FROM s 
-            JOIN videos_validos vv ON s.video_id = vv.video_id
-            JOIN alvo_pais a ON REGEXP_MATCHES(s.texto_limpo, '(^|\s)' || a.pais || '($|\s)')
-            GROUP BY a.pais 
+
+        con.register(
+            "paises_df",
+            pd.DataFrame({"pais": paises_monitorados})
+        )
+
+        padrao = "|".join(
+            rf"(^|\s){re.escape(t)}($|\s)"
+            for t in termos_conflito
+        )
+
+        #
+        # 1) Junta todos os trechos de cada vídeo.
+        #
+        videos_validos = con.execute(f"""
+            SELECT
+                video_id,
+                string_agg(texto_limpo, ' ') AS texto_video
+            FROM read_parquet('{src}')
+            GROUP BY video_id
+        """).df()
+
+        #
+        # 2) Mantém somente vídeos geopolíticos.
+        #
+        videos_validos = videos_validos[
+            videos_validos["texto_video"].str.contains(
+                padrao,
+                regex=True,
+                na=False,
+            )
+        ]
+
+        if videos_validos.empty:
+            log.info("Nenhum vídeo geopolítico encontrado.")
+
+            out = Path("./datalake/gold")
+            out.mkdir(parents=True, exist_ok=True)
+
+            pd.DataFrame(columns=["pais", "mencoes"]).to_parquet(
+                out / "clipping_geopolitica.parquet",
+                index=False,
+            )
+
+            pd.DataFrame(
+                columns=["pais_a", "pais_b", "mencoes_juntos"]
+            ).to_parquet(
+                out / "coocorrencia_paises.parquet",
+                index=False,
+            )
+
+            return pd.DataFrame()
+
+        con.register("videos_validos", videos_validos[["video_id"]])
+
+        #
+        # 3) Conta países.
+        #
+        gold_individual = con.execute(f"""
+            WITH s AS (
+                SELECT *
+                FROM read_parquet('{src}')
+            )
+
+            SELECT
+                p.pais,
+                COUNT(*) AS mencoes
+            FROM s
+
+            JOIN videos_validos v
+                ON s.video_id = v.video_id
+
+            JOIN paises_df p
+                ON regexp_matches(
+                    s.texto_limpo,
+                    '(^|\\s)' || p.pais || '($|\\s)'
+                )
+
+            GROUP BY p.pais
+
             ORDER BY mencoes DESC
         """).df()
-        
-        # QUERY 2: Coocorrência Geopolítica restrita apenas aos vídeos do vocabulário
-        gold_conexoes = con.execute(r"""
-            WITH s AS (SELECT * FROM read_parquet('""" + src + r"""')),
-                 alvo_pais AS (SELECT UNNEST(['""" + lista_paises_sql + r"""']) AS pais),
-                 alvo_termo AS (SELECT UNNEST(['""" + lista_termos_sql + r"""']) AS termo),
-                 
-                 videos_validos AS (
-                     SELECT DISTINCT s.video_id 
-                     FROM s
-                     JOIN alvo_termo t ON REGEXP_MATCHES(s.texto_limpo, '(^|\s)' || t.termo || '($|\s)')
-                 ),
-                 mencoes_por_trecho AS (
-                     SELECT s.video_id, s.ordem, a.pais
-                     FROM s
-                     JOIN videos_validos vv ON s.video_id = vv.video_id
-                     JOIN alvo_pais a ON REGEXP_MATCHES(s.texto_limpo, '(^|\s)' || a.pais || '($|\s)')
-                 )
-            SELECT 
-                m1.pais AS pais_a, 
-                m2.pais AS pais_b, 
+
+        #
+        # 4) Coocorrência.
+        #
+        gold_conexoes = con.execute(f"""
+            WITH s AS (
+                SELECT *
+                FROM read_parquet('{src}')
+            ),
+
+            mencoes AS (
+                SELECT
+                    s.video_id,
+                    s.ordem,
+                    p.pais
+                FROM s
+
+                JOIN videos_validos v
+                    ON s.video_id = v.video_id
+
+                JOIN paises_df p
+                    ON regexp_matches(
+                        s.texto_limpo,
+                        '(^|\\s)' || p.pais || '($|\\s)'
+                    )
+            )
+
+            SELECT
+                a.pais AS pais_a,
+                b.pais AS pais_b,
                 COUNT(*) AS mencoes_juntos
-            FROM mencoes_por_trecho m1
-            JOIN mencoes_por_trecho m2 ON m1.video_id = m2.video_id AND m1.ordem = m2.ordem
-            WHERE m1.pais < m2.pais
-            GROUP BY m1.pais, m2.pais
+
+            FROM mencoes a
+
+            JOIN mencoes b
+
+                ON a.video_id = b.video_id
+               AND a.ordem = b.ordem
+
+            WHERE a.pais < b.pais
+
+            GROUP BY
+                a.pais,
+                b.pais
+
             ORDER BY mencoes_juntos DESC
         """).df()
 
         out = Path("./datalake/gold")
         out.mkdir(parents=True, exist_ok=True)
-        
-        gold_individual.to_parquet(out / "clipping_geopolitica.parquet", index=False)
-        gold_conexoes.to_parquet(out / "coocorrencia_paises.parquet", index=False)
-        
-        log.info("📊 Camada Gold processada com sucesso aplicando o vocabulário do canais.yaml.")
+
+        gold_individual.to_parquet(
+            out / "clipping_geopolitica.parquet",
+            index=False,
+        )
+
+        gold_conexoes.to_parquet(
+            out / "coocorrencia_paises.parquet",
+            index=False,
+        )
+
+        log.info(
+            "Camada Gold recalculada (%d vídeos geopolíticos).",
+            len(videos_validos),
+        )
+
         return gold_individual
-        
+
     except duckdb.IOException:
-        log.warning("⚠️ DuckDB: Ainda não existem arquivos Silver Parquet para processar a Gold.")
+
+        log.warning("Ainda não existem arquivos Silver.")
+
         return pd.DataFrame()
+
     finally:
         con.close()
 
