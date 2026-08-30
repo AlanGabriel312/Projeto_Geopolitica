@@ -1,0 +1,12 @@
+# Tema visual compartilhado do GeoPulse (claro / corporativo).
+# Aplica-se a TODAS as páginas do app multipage.
+[theme]
+base = "light"
+primaryColor = "#9E1B1B"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f4f5f7"
+textColor = "#1f2430"
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"
